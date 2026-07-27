@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Point & Say">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Point & Say</title>
+<style>
+  :root {
+    --bg: #EAF6FF;
+    --ink: #2E2B26;
+    --muted: #6D84A0;
+    --primary: #FF922B;
+    --primary-light: #FFD8A8;
+    --card: #FFFFFF;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    min-height: 100dvh;
+    font-family: ui-rounded, 'Segoe UI Rounded', -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    overflow-x: hidden;
+  }
+  [hidden] { display: none !important; }
+
+  .board-screen { min-height: 100dvh; padding: 32px 20px 48px; }
+  .board-header { text-align: center; margin-bottom: 24px; }
+  .board-header h1 {
+    font-size: 36px;
+    font-weight: 800;
+    margin: 0 0 8px;
+    color: #FF922B;
+  }
+  @supports ((background-clip: text) or (-webkit-background-clip: text)) {
+    .board-header h1 {
+      background: linear-gradient(90deg, #FF6B6B, #FF922B, #3BC9DB, #845EF7);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+    }
+  }
+  .board-header p { margin: 0; font-size: 15px; color: var(--muted); font-weight: 700; }
+
+  .tile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+    gap: 14px;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .tile {
+    background: var(--card);
+    border-radius: 18px;
+    padding: 16px 8px;
+    min-height: 112px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 4px 14px rgba(46,43,38,0.1);
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+    touch-action: manipulation;
+    position: relative;
+  }
+  .tile:active { transform: scale(0.95); }
+  .tile:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+  .tile-emoji { font-size: 38px; line-height: 1; }
+  .tile-photo { width: 60px; height: 60px; border-radius: 12px; object-fit: cover; border: 3px solid rgba(255,255,255,0.8); }
+  .tile-label { font-size: 13px; font-weight: 800; color: var(--ink); text-align: center; }
+  .tile.add-tile { background: var(--card); border: 3px dashed var(--primary-light); box-shadow: none; color: var(--muted); }
+  .tile.add-tile .tile-emoji { color: var(--primary); font-weight: 800; }
+  .tile-remove {
+    position: absolute; top: 6px; right: 6px; width: 22px; height: 22px;
+    border-radius: 50%; background: rgba(46,43,38,0.45); color: #fff; border: none;
+    font-size: 14px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .category-bar {
+    display: flex; gap: 8px; overflow-x: auto; max-width: 720px; margin: 0 auto 18px;
+    padding: 2px 2px 8px; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .category-bar::-webkit-scrollbar { display: none; }
+  .category-pill {
+    flex: 0 0 auto; background: var(--card); color: var(--muted); border: 2px solid var(--primary-light);
+    border-radius: 999px; padding: 9px 18px; font-family: inherit; font-weight: 800; font-size: 14px;
+    cursor: pointer; touch-action: manipulation; white-space: nowrap;
+  }
+  .category-pill.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .category-pill:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+
+  .corner-controls {
+    position: fixed; top: 14px; right: 14px; display: flex; gap: 8px; z-index: 15;
+  }
+  .icon-btn {
+    width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(255,255,255,0.85);
+    box-shadow: 0 2px 10px rgba(46,43,38,0.15); font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; touch-action: manipulation;
+  }
+  .icon-btn:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+  .icon-btn.unlocked { background: var(--primary-light); }
+
+  .edit-banner {
+    position: fixed; top: 62px; right: 14px; max-width: 220px; background: var(--ink); color: #fff;
+    font-size: 12px; font-weight: 700; padding: 10px 14px; border-radius: 14px; z-index: 15;
+    box-shadow: 0 4px 14px rgba(46,43,38,0.25); text-align: right;
+  }
+
+  .word-bar {
+    position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 16px);
+    background: var(--card); padding: 14px 34px; border-radius: 999px;
+    border: 4px solid var(--primary);
+    box-shadow: 0 10px 28px rgba(46,43,38,0.18);
+    font-size: 30px; font-weight: 800; color: var(--ink);
+    opacity: 0; transition: opacity 0.35s ease, transform 0.35s ease;
+    pointer-events: none; z-index: 10; text-align: center; max-width: 85vw;
+  }
+  .word-bar.visible { opacity: 1; transform: translate(-50%, 0); }
+
+  .primary-btn {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    padding: 16px 34px;
+    font-family: inherit;
+    font-weight: 800;
+    font-size: 17px;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(255,146,43,0.4);
+    touch-action: manipulation;
+  }
+  .primary-btn:active { transform: scale(0.96); }
+  .primary-btn:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+
+  .btn-secondary {
+    background: transparent; border: 2px solid var(--primary-light); color: var(--ink);
+    border-radius: 999px; padding: 14px 26px; font-family: inherit;
+    font-weight: 700; font-size: 15px; cursor: pointer; touch-action: manipulation;
+  }
+  .btn-secondary:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(46,43,38,0.4);
+    display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 20;
+  }
+  .modal-card { background: var(--card); border-radius: 24px; padding: 28px 24px; max-width: 340px; width: 100%; text-align: center; }
+  .modal-card h2 { font-size: 22px; margin: 0 0 18px; color: var(--primary); font-weight: 800; }
+  .modal-preview { width: 120px; height: 120px; border-radius: 16px; object-fit: cover; margin: 0 auto 16px; display: block; background: var(--bg); }
+  .modal-input {
+    width: 100%; padding: 12px 16px; border-radius: 999px; border: 2px solid var(--primary-light);
+    font-family: inherit; font-size: 16px; margin-bottom: 18px; text-align: center;
+  }
+  .modal-input:focus-visible, .modal-input:focus { outline: 3px solid var(--primary); outline-offset: 2px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: center; }
+</style>
+</head>
+<body>
+
+<div id="boardScreen" class="board-screen">
+  <div class="board-header">
+    <h1>Point &amp; Say</h1>
+    <p>Tap a picture to hear the word.</p>
+  </div>
+  <div class="category-bar" id="categoryBar"></div>
+  <div class="tile-grid" id="tileGrid"></div>
+</div>
+
+<div id="wordBar" class="word-bar"></div>
+
+<div class="corner-controls">
+  <button id="lockBtn" type="button" class="icon-btn" aria-label="Hold to unlock editing">🔒</button>
+  <button id="backupBtn" type="button" class="icon-btn" hidden aria-label="Backup custom words">⬇️</button>
+  <button id="restoreBtn" type="button" class="icon-btn" hidden aria-label="Restore custom words">⬆️</button>
+</div>
+<input type="file" id="restoreFileInput" accept="application/json" hidden>
+<div id="editBanner" class="edit-banner" hidden>Edit Mode — tap + to add words, × to remove them. Tap the lock to exit.</div>
+
+<div id="addModal" class="modal-backdrop" hidden>
+  <div class="modal-card">
+    <h2>Add a Photo</h2>
+    <img id="addPreview" class="modal-preview" hidden alt="">
+    <button id="addPickBtn" type="button" class="primary-btn" style="margin-bottom:18px;">📷 Choose Photo</button>
+    <input type="file" id="addFileInput" accept="image/*" capture="environment" hidden>
+    <input type="text" id="addLabelInput" class="modal-input" placeholder="What is it called?" maxlength="30" hidden>
+    <select id="addCategorySelect" class="modal-input" hidden></select>
+    <div class="modal-actions">
+      <button id="addCancelBtn" type="button" class="btn-secondary">Cancel</button>
+      <button id="addSaveBtn" type="button" class="primary-btn" hidden>Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const tileGrid = document.getElementById('tileGrid');
+  const wordBar = document.getElementById('wordBar');
+
+  const addModal = document.getElementById('addModal');
+  const addPreview = document.getElementById('addPreview');
+  const addPickBtn = document.getElementById('addPickBtn');
+  const addFileInput = document.getElementById('addFileInput');
+  const addLabelInput = document.getElementById('addLabelInput');
+  const addCancelBtn = document.getElementById('addCancelBtn');
+  const addSaveBtn = document.getElementById('addSaveBtn');
+  const addCategorySelect = document.getElementById('addCategorySelect');
+
+  const categoryBar = document.getElementById('categoryBar');
+  const lockBtn = document.getElementById('lockBtn');
+  const backupBtn = document.getElementById('backupBtn');
+  const restoreBtn = document.getElementById('restoreBtn');
+  const restoreFileInput = document.getElementById('restoreFileInput');
+  const editBanner = document.getElementById('editBanner');
+
+  const TILE_COLORS = ['#FFE3E3', '#FFE8CC', '#FFF3BF', '#D3F9D8', '#C5F6FA', '#D0EBFF', '#E5DBFF', '#FFDEEB'];
+
+  const CATEGORIES = ['Home', 'Food', 'Bathroom', 'Out & About', 'My Words'];
+  const CATEGORY_KEY = 'point-and-say-selected-category';
+
+  const BASE_ITEMS = [
+    { label: 'Bed', emoji: '🛏️', category: 'Home' }, { label: 'Chair', emoji: '🪑', category: 'Home' },
+    { label: 'Door', emoji: '🚪', category: 'Home' }, { label: 'Window', emoji: '🪟', category: 'Home' },
+    { label: 'Couch', emoji: '🛋️', category: 'Home' }, { label: 'TV', emoji: '📺', category: 'Home' },
+    { label: 'Phone', emoji: '📱', category: 'Home' }, { label: 'Clock', emoji: '⏰', category: 'Home' },
+    { label: 'Light', emoji: '💡', category: 'Home' }, { label: 'Mirror', emoji: '🪞', category: 'Home' },
+    { label: 'Trash Can', emoji: '🗑️', category: 'Home' }, { label: 'Book', emoji: '📖', category: 'Home' },
+    { label: 'Cup', emoji: '🥤', category: 'Food' }, { label: 'Plate', emoji: '🍽️', category: 'Food' },
+    { label: 'Spoon', emoji: '🥄', category: 'Food' },
+    { label: 'Toilet', emoji: '🚽', category: 'Bathroom' }, { label: 'Bathtub', emoji: '🛁', category: 'Bathroom' },
+    { label: 'Toothbrush', emoji: '🪥', category: 'Bathroom' }, { label: 'Sink', emoji: '🚰', category: 'Bathroom' },
+    { label: 'Soap', emoji: '🧼', category: 'Bathroom' },
+    { label: 'Shoe', emoji: '👟', category: 'Out & About' }, { label: 'Key', emoji: '🔑', category: 'Out & About' },
+    { label: 'Backpack', emoji: '🎒', category: 'Out & About' }, { label: 'Ball', emoji: '⚽', category: 'Out & About' },
+    { label: 'Umbrella', emoji: '☂️', category: 'Out & About' }
+  ];
+
+  let customItems = [];
+  let wordHideTimer = null;
+  let pendingPhotoDataUrl = null;
+  let isEditMode = false;
+  let selectedCategory = 'All';
+  try { selectedCategory = localStorage.getItem(CATEGORY_KEY) || 'All'; } catch (e) {}
+
+  function announce(label) {
+    wordBar.textContent = label;
+    wordBar.classList.add('visible');
+    clearTimeout(wordHideTimer);
+    wordHideTimer = setTimeout(function () { wordBar.classList.remove('visible'); }, 4500);
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(label);
+      utter.rate = 0.85;
+      window.speechSynthesis.speak(utter);
+    }
+  }
+
+  var STORAGE_KEY = 'point-and-say-custom-items';
+
+  function saveCustomItems() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(customItems));
+    } catch (e) {
+      // Storage full or unavailable (e.g. private browsing) - fail silently,
+      // tiles will still work for this session.
+    }
+  }
+
+  function loadCustomItems() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) customItems = JSON.parse(raw);
+    } catch (e) {
+      customItems = [];
+    }
+    renderBoard();
+  }
+
+  function renderCategoryBar() {
+    categoryBar.innerHTML = '';
+    ['All'].concat(CATEGORIES).forEach(function (cat) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'category-pill' + (selectedCategory === cat ? ' active' : '');
+      btn.textContent = cat;
+      btn.addEventListener('click', function () {
+        selectedCategory = cat;
+        try { localStorage.setItem(CATEGORY_KEY, cat); } catch (e) {}
+        renderBoard();
+      });
+      categoryBar.appendChild(btn);
+    });
+  }
+
+  function renderBoard() {
+    renderCategoryBar();
+    tileGrid.innerHTML = '';
+    let colorIndex = 0;
+    BASE_ITEMS.forEach(function (item) {
+      if (selectedCategory !== 'All' && item.category !== selectedCategory) return;
+      tileGrid.appendChild(makeTile(item.label, null, item.emoji, null, colorIndex++));
+    });
+    customItems.forEach(function (item, index) {
+      const cat = item.category || 'My Words';
+      if (selectedCategory !== 'All' && cat !== selectedCategory) return;
+      tileGrid.appendChild(makeTile(item.label, item.photo, null, index, colorIndex++));
+    });
+    if (isEditMode) tileGrid.appendChild(makeAddTile());
+  }
+
+  function makeTile(label, photoDataUrl, emoji, customIndex, colorIndex) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'tile';
+    btn.style.background = TILE_COLORS[colorIndex % TILE_COLORS.length];
+
+    if (photoDataUrl) {
+      const img = document.createElement('img');
+      img.className = 'tile-photo';
+      img.src = photoDataUrl;
+      img.alt = '';
+      btn.appendChild(img);
+    } else {
+      const span = document.createElement('span');
+      span.className = 'tile-emoji';
+      span.textContent = emoji;
+      btn.appendChild(span);
+    }
+
+    const labelEl = document.createElement('span');
+    labelEl.className = 'tile-label';
+    labelEl.textContent = label;
+    btn.appendChild(labelEl);
+
+    btn.addEventListener('click', function () { announce(label); });
+
+    if (customIndex !== null && isEditMode) {
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'tile-remove';
+      removeBtn.textContent = '\u00D7';
+      removeBtn.setAttribute('aria-label', 'Remove ' + label);
+      removeBtn.addEventListener('click', function (evt) {
+        evt.stopPropagation();
+        if (!window.confirm('Remove "' + label + '"?')) return;
+        customItems.splice(customIndex, 1);
+        saveCustomItems();
+        renderBoard();
+      });
+      btn.appendChild(removeBtn);
+    }
+    return btn;
+  }
+
+  function makeAddTile() {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'tile add-tile';
+    const span = document.createElement('span');
+    span.className = 'tile-emoji';
+    span.textContent = '+';
+    const labelEl = document.createElement('span');
+    labelEl.className = 'tile-label';
+    labelEl.textContent = 'Add';
+    btn.appendChild(span);
+    btn.appendChild(labelEl);
+    btn.addEventListener('click', openAddModal);
+    return btn;
+  }
+
+  if (addCategorySelect) {
+    CATEGORIES.forEach(function (cat) {
+      const opt = document.createElement('option');
+      opt.value = cat;
+      opt.textContent = cat;
+      addCategorySelect.appendChild(opt);
+    });
+  }
+
+  function openAddModal() {
+    pendingPhotoDataUrl = null;
+    addPreview.hidden = true;
+    addPickBtn.hidden = false;
+    addLabelInput.hidden = true;
+    addLabelInput.value = '';
+    if (addCategorySelect) { addCategorySelect.hidden = true; addCategorySelect.value = 'My Words'; }
+    addSaveBtn.hidden = true;
+    addFileInput.value = '';
+    addModal.hidden = false;
+  }
+  function closeAddModal() { addModal.hidden = true; }
+
+  function setEditMode(on) {
+    isEditMode = on;
+    lockBtn.textContent = on ? '🔓' : '🔒';
+    lockBtn.classList.toggle('unlocked', on);
+    lockBtn.setAttribute('aria-label', on ? 'Tap to lock editing' : 'Hold to unlock editing');
+    backupBtn.hidden = !on;
+    restoreBtn.hidden = !on;
+    editBanner.hidden = !on;
+    renderBoard();
+  }
+
+  (function setupLockButton() {
+    let holdTimer = null;
+    lockBtn.addEventListener('pointerdown', function () {
+      if (isEditMode) return;
+      holdTimer = setTimeout(function () { setEditMode(true); }, 900);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (evt) {
+      lockBtn.addEventListener(evt, function () { clearTimeout(holdTimer); });
+    });
+    lockBtn.addEventListener('click', function () {
+      if (isEditMode) setEditMode(false);
+    });
+  })();
+
+  if (backupBtn) backupBtn.addEventListener('click', function () {
+    try {
+      const data = JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), items: customItems }, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'point-and-say-backup.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    } catch (e) {
+      window.alert('Could not create the backup file.');
+    }
+  });
+
+  if (restoreBtn) restoreBtn.addEventListener('click', function () { restoreFileInput.click(); });
+
+  if (restoreFileInput) restoreFileInput.addEventListener('change', function (e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function () {
+      try {
+        const parsed = JSON.parse(reader.result);
+        const items = Array.isArray(parsed) ? parsed : (parsed && Array.isArray(parsed.items) ? parsed.items : null);
+        if (!items) { window.alert("That file doesn't look like a Point & Say backup."); return; }
+        if (!window.confirm('Import ' + items.length + ' word(s)? This will replace your current custom words.')) return;
+        customItems = items
+          .filter(function (it) { return it && it.label && it.photo; })
+          .map(function (it) {
+            return { label: String(it.label).slice(0, 30), photo: it.photo, category: it.category || 'My Words' };
+          });
+        saveCustomItems();
+        renderBoard();
+        window.alert('Backup restored!');
+      } catch (e) {
+        window.alert('Could not read that file.');
+      }
+    };
+    reader.readAsText(file);
+    restoreFileInput.value = '';
+  });
+
+  // Render the tile board right away, before anything below that could
+  // throw in a locked-down preview (e.g. a Files-app quick-look sandbox).
+  // That way the words always show up even if the Add-a-photo controls
+  // below can't fully wire up in that context.
+  try { renderBoard(); } catch (e) {}
+  try { loadCustomItems(); } catch (e) {}
+
+  try {
+    if (addPickBtn) addPickBtn.addEventListener('click', function () { addFileInput.click(); });
+    if (addCancelBtn) addCancelBtn.addEventListener('click', closeAddModal);
+
+    if (addFileInput) addFileInput.addEventListener('change', function (e) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      resizeImageFile(file, 400, 0.75).then(function (dataUrl) {
+        pendingPhotoDataUrl = dataUrl;
+        addPreview.src = dataUrl;
+        addPreview.hidden = false;
+        addPickBtn.hidden = true;
+        addLabelInput.hidden = false;
+        if (addCategorySelect) addCategorySelect.hidden = false;
+        addSaveBtn.hidden = false;
+        addLabelInput.focus();
+      }).catch(function () {});
+    });
+
+    if (addLabelInput) addLabelInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') addSaveBtn.click();
+    });
+
+    if (addSaveBtn) addSaveBtn.addEventListener('click', function () {
+      const label = addLabelInput.value.trim();
+      if (!label || !pendingPhotoDataUrl) return;
+      const category = (addCategorySelect && addCategorySelect.value) || 'My Words';
+      customItems.push({ label: label, photo: pendingPhotoDataUrl, category: category });
+      saveCustomItems();
+      renderBoard();
+      closeAddModal();
+    });
+  } catch (e) {}
+
+  function resizeImageFile(file, maxSize, quality) {
+    return new Promise(function (resolve, reject) {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = function () {
+        let w = img.naturalWidth, h = img.naturalHeight;
+        if (w >= h && w > maxSize) { h = Math.round(h * maxSize / w); w = maxSize; }
+        else if (h > w && h > maxSize) { w = Math.round(w * maxSize / h); h = maxSize; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('image failed to load')); };
+      img.src = url;
+    });
+  }
+})();
+</script>
+</body>
+</html>
